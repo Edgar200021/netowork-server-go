@@ -4,7 +4,7 @@ run:
 	go run ./cmd/api/main.go
 
 test:
-	go test -v $$(go list ./tests/... | grep -v /testapp) -p 20 -count=1
+	go test -v $$(go list ./tests/... | grep -v /testapp) -p 40 -count=1
 
 build:
 	go build -o bin/api ./cmd/api

@@ -14,35 +14,13 @@ import (
 func setupSignInTest(t *testing.T) (*testapp.TestApp, testapp.SignupData) {
 	t.Helper()
 
-	signupData := testapp.GenerateFakeData[testapp.SignupData](t)
-	app := testapp.New(t)
-
-	response, err := app.SignUp(signupData)
-
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusCreated, response.StatusCode())
-
-	verificationToken, err := app.GetVerificationToken()
-
-	assert.NoError(t, err)
-	assert.NotEqual(t, verificationToken, "")
-
-	verificationResponse, err := app.VerifyAccount(
-		map[string]string{
-			"email": signupData.Email,
-			"token": verificationToken,
-		},
-	)
-
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusOK, verificationResponse.StatusCode())
-
-	return app, signupData
+	return testapp.New(t), testapp.GenerateFakeData[testapp.SignupData](t)
 }
 
 func TestSignIn_Returns200_When_RequestIsValid(t *testing.T) {
 	t.Parallel()
 	app, data := setupSignInTest(t)
+	app.CreateAndVerify(t, data)
 
 	response, err := app.SignIn(
 		map[string]string{
@@ -79,6 +57,7 @@ func TestSignIn_Returns400_When_RequestIsInvalid(t *testing.T) {
 			data: map[string]string{
 				"password": data.Password,
 			},
+			expectedErrorField: "email",
 		},
 		{
 			name: "invalid email",
@@ -86,26 +65,30 @@ func TestSignIn_Returns400_When_RequestIsInvalid(t *testing.T) {
 				"email":    "invalid email",
 				"password": data.Password,
 			},
+			expectedErrorField: "email",
 		},
 		{
 			name: "empty password",
 			data: map[string]string{
 				"email": data.Email,
 			},
+			expectedErrorField: "password",
 		},
 		{
 			name: "password too short",
 			data: map[string]string{
-				"email":    "invalid email",
+				"email":    data.Email,
 				"password": strings.Repeat("q", testapp.PasswordMinLength-1),
 			},
+			expectedErrorField: "password",
 		},
 		{
 			name: "password too long",
 			data: map[string]string{
-				"email":    "invalid email",
+				"email":    data.Email,
 				"password": strings.Repeat("q", testapp.PasswordMaxLength+1),
 			},
+			expectedErrorField: "password",
 		},
 	}
 
@@ -118,6 +101,7 @@ func TestSignIn_Returns400_When_RequestIsInvalid(t *testing.T) {
 
 				assert.NoError(t, err)
 				assert.Equal(t, http.StatusBadRequest, response.StatusCode())
+				app.AssertValidationErrors(t, response, test.expectedErrorField)
 			},
 		)
 	}
@@ -126,6 +110,7 @@ func TestSignIn_Returns400_When_RequestIsInvalid(t *testing.T) {
 func TestSignIn_Returns400_When_UserIsBanned(t *testing.T) {
 	t.Parallel()
 	app, data := setupSignInTest(t)
+	app.CreateAndVerify(t, data)
 
 	err := app.BanUser(data.Email)
 	assert.NoError(t, err)
@@ -143,18 +128,17 @@ func TestSignIn_Returns400_When_UserIsBanned(t *testing.T) {
 
 func TestSignIn_Returns400_When_UserIsNotVerified(t *testing.T) {
 	t.Parallel()
-	signupData := testapp.GenerateFakeData[testapp.SignupData](t)
-	app := testapp.New(t)
+	app, data := setupSignInTest(t)
 
-	response, err := app.SignUp(signupData)
+	response, err := app.SignUp(data)
 
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusCreated, response.StatusCode())
 
 	signInResponse, err := app.SignIn(
 		map[string]string{
-			"email":    signupData.Email,
-			"password": signupData.Password,
+			"email":    data.Email,
+			"password": data.Password,
 		},
 	)
 

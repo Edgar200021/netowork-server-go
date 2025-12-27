@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
 	"path"
 	"runtime"
 	"testing"
@@ -75,11 +75,13 @@ func New(t *testing.T) *TestApp {
 	application := app.New(
 		ln, cfg, slog.New(
 			slog.NewTextHandler(
-				os.Stdout,
+				io.Discard,
 				&slog.HandlerOptions{},
 			),
 		),
 	)
+
+	log.SetOutput(io.Discard)
 
 	go func() {
 		if err := application.Run(); err != nil {

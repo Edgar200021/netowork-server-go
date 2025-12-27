@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"log"
 	"path"
 	"runtime"
@@ -52,6 +53,10 @@ func setupDb(config *config.PostgresConfig) (*sql.DB, func()) {
 		panic(err)
 	}
 
+	goose.SetLogger(
+		log.New(io.Discard, "", 0),
+	)
+
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
 		log.Fatal("Cannot get current file path")
@@ -85,8 +90,9 @@ func setupRedis(config *config.RedisConfig) (*redis.Client, func()) {
 	ctx := context.Background()
 
 	redisContainer, err := tcRedis.Run(
-		ctx, "redis:8",
+		ctx, "redis:8", tc.WithLogger(log.New(io.Discard, "", 0)),
 	)
+
 	if err != nil {
 		log.Fatal(err)
 	}

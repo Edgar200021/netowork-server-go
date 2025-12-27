@@ -12,17 +12,18 @@ func setupForgotPasswordTest(t *testing.T) (*testapp.TestApp, testapp.SignupData
 	t.Helper()
 
 	return testapp.New(t), testapp.GenerateFakeData[testapp.SignupData](t)
+
 }
 
 func TestForgotPassword_Returns200_When_RequestIsValid(t *testing.T) {
 	t.Parallel()
 	app, data := setupForgotPasswordTest(t)
-	cookies := app.CreateAndSignIn(t, data)
+	app.CreateAndVerify(t, data)
 
 	response, err := app.ForgotPassword(
 		map[string]string{
 			"email": data.Email,
-		}, cookies,
+		},
 	)
 
 	assert.NoError(t, err)
@@ -32,23 +33,26 @@ func TestForgotPassword_Returns200_When_RequestIsValid(t *testing.T) {
 func TestForgotPassword_Returns400_When_RequestIsInvalid(t *testing.T) {
 	t.Parallel()
 	app, data := setupForgotPasswordTest(t)
-	cookies := app.CreateAndSignIn(t, data)
+	app.CreateAndVerify(t, data)
 
 	testCases := []struct {
-		name string
-		data map[string]string
+		name               string
+		data               map[string]string
+		expectedErrorField string
 	}{
 		{
 			name: "empty email",
 			data: map[string]string{
 				"email": "",
 			},
+			expectedErrorField: "email",
 		},
 		{
 			name: "invalid email",
 			data: map[string]string{
 				"email": "invalid email",
 			},
+			expectedErrorField: "email",
 		},
 	}
 
@@ -58,11 +62,12 @@ func TestForgotPassword_Returns400_When_RequestIsInvalid(t *testing.T) {
 				t.Parallel()
 
 				response, err := app.ForgotPassword(
-					test.data, cookies,
+					test.data,
 				)
 
 				assert.NoError(t, err)
 				assert.Equal(t, http.StatusBadRequest, response.StatusCode())
+				app.AssertValidationErrors(t, response, test.expectedErrorField)
 			},
 		)
 	}
@@ -71,7 +76,7 @@ func TestForgotPassword_Returns400_When_RequestIsInvalid(t *testing.T) {
 func TestForgotPassword_Returns400_When_UserIsBanned(t *testing.T) {
 	t.Parallel()
 	app, data := setupForgotPasswordTest(t)
-	cookies := app.CreateAndSignIn(t, data)
+	app.CreateAndVerify(t, data)
 
 	err := app.BanUser(data.Email)
 	assert.NoError(t, err)
@@ -79,7 +84,7 @@ func TestForgotPassword_Returns400_When_UserIsBanned(t *testing.T) {
 	response, err := app.ForgotPassword(
 		map[string]string{
 			"email": data.Email,
-		}, cookies,
+		},
 	)
 
 	assert.NoError(t, err)
@@ -98,7 +103,7 @@ func TestForgotPassword_Returns400_When_UserIsNotVerified(t *testing.T) {
 	signInResponse, err := app.ForgotPassword(
 		map[string]string{
 			"email": data.Email,
-		}, nil,
+		},
 	)
 
 	assert.NoError(t, err)

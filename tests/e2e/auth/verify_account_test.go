@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/Edgar200021/netowork-server-go/.gen/netowork/public/model"
 	. "github.com/Edgar200021/netowork-server-go/.gen/netowork/public/table"
 	"github.com/Edgar200021/netowork-server-go/tests/testapp"
 	"github.com/alecthomas/assert/v2"
@@ -60,11 +59,7 @@ func TestVerifyAccount_ShouldApplyChangesIntoDatabase_When_RequestIsValid(t *tes
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, verifyAccountResponse.StatusCode())
 
-	var dbUser model.Users
-
-	stmt := SELECT(Users.IsVerified).FROM(Users).WHERE(Users.Email.EQ(Text(data.Email)))
-
-	err = stmt.Query(app.Db, &dbUser)
+	dbUser, err := app.GetUser(data.Email)
 
 	assert.NoError(t, err)
 	assert.True(t, dbUser.IsVerified)

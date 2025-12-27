@@ -21,5 +21,6 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.DeleteSessionCookie(w)
 	http_helpers.WriteSuccessJson(w, "Success", http.StatusOK)
 }

@@ -35,10 +35,10 @@ func (a *TestApp) VerifyAccount(data interface{}) (*resty.Response, error) {
 	return response, nil
 }
 
-func (a *TestApp) ForgotPassword(data interface{}, cookies []*http.Cookie) (
+func (a *TestApp) ForgotPassword(data interface{}) (
 	*resty.Response, error,
 ) {
-	response, err := a.client.R().SetBody(data).SetCookies(cookies).Post(
+	response, err := a.client.R().SetBody(data).Post(
 		a.
 			addressV1 + "/auth/forgot-password",
 	)
@@ -49,8 +49,31 @@ func (a *TestApp) ForgotPassword(data interface{}, cookies []*http.Cookie) (
 	return response, nil
 }
 
-func (a *TestApp) CreateAndSignIn(t *testing.T, data SignupData) []*http.Cookie {
-	t.Helper()
+func (a *TestApp) ResetPassword(data interface{}) (
+	*resty.Response,
+	error,
+) {
+	response, err := a.client.R().SetBody(data).Post(
+		a.
+			addressV1 + "/auth/reset-password",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (a *TestApp) Logout(cookies []*http.Cookie) (*resty.Response, error) {
+	response, err := a.client.R().SetCookies(cookies).Post(a.addressV1 + "/auth/logout")
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (a *TestApp) CreateAndVerify(t *testing.T, data SignupData) {
 	response, err := a.SignUp(data)
 
 	assert.NoError(t, err)
@@ -59,7 +82,7 @@ func (a *TestApp) CreateAndSignIn(t *testing.T, data SignupData) []*http.Cookie 
 	verificationToken, err := a.GetVerificationToken()
 
 	assert.NoError(t, err)
-	assert.NotEqual(t, verificationToken, "")
+	assert.NotEqual(t, "", verificationToken)
 
 	verificationResponse, err := a.VerifyAccount(
 		map[string]string{
@@ -70,6 +93,10 @@ func (a *TestApp) CreateAndSignIn(t *testing.T, data SignupData) []*http.Cookie 
 
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, verificationResponse.StatusCode())
+}
+
+func (a *TestApp) CreateAndSignIn(t *testing.T, data SignupData) []*http.Cookie {
+	a.CreateAndVerify(t, data)
 
 	signInResponse, err := a.SignIn(
 		map[string]string{
