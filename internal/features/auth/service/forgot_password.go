@@ -18,6 +18,12 @@ func (s *AuthService) ForgotPassword(ctx context.Context, data *ForgotPasswordRe
 	if user == nil {
 		return autherrors.ErrUserNotFound
 	}
+	if !user.IsVerified {
+		return autherrors.ErrUserNotVerified
+	}
+	if user.IsBanned {
+		return autherrors.ErrUserBanned
+	}
 
 	token := token2.GenerateSecureToken(16)
 	if err := s.cache.Set(

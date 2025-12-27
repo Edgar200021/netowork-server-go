@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (s *AuthService) Verify(ctx context.Context, sessionId string) (*UserResponse, error) {
+func (s *AuthService) Authenticate(ctx context.Context, sessionId string) (*UserResponse, error) {
 	userId, err := s.cache.GetEx(
 		ctx, s.generateSessionKey(sessionId),
 		time.Minute*time.Duration(s.appConfig.SessionTTLMinutes),

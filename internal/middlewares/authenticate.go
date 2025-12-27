@@ -23,7 +23,7 @@ func (m *Middlewares) Authenticate(next http.Handler) http.Handler {
 				return
 			}
 
-			user, err := m.authService.Verify(r.Context(), cookie.Value)
+			user, err := m.authService.Authenticate(r.Context(), cookie.Value)
 			if err != nil {
 				errorhandler.HandleError(w, err, logger)
 				return

@@ -1,6 +1,10 @@
 package testapp
 
-import "github.com/go-faker/faker/v4"
+import (
+	"testing"
+
+	"github.com/go-faker/faker/v4"
+)
 
 type SignupData struct {
 	FirstName string `faker:"first_name,len=10"`
@@ -10,12 +14,12 @@ type SignupData struct {
 	Role      string `faker:"oneof: client, freelancer"`
 }
 
-func GenerateFakeData[T any]() T {
+func GenerateFakeData[T any](t *testing.T) T {
 	var data T
 
 	err := faker.FakeData(&data)
 	if err != nil {
-		panic(err)
+		t.FailNow()
 	}
 
 	return data

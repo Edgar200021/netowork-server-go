@@ -1,6 +1,10 @@
 package testapp
 
 import (
+	"net/http"
+	"testing"
+
+	"github.com/alecthomas/assert/v2"
 	"github.com/go-resty/resty/v2"
 )
 
@@ -29,4 +33,56 @@ func (a *TestApp) VerifyAccount(data interface{}) (*resty.Response, error) {
 	}
 
 	return response, nil
+}
+
+func (a *TestApp) ForgotPassword(data interface{}, cookies []*http.Cookie) (
+	*resty.Response, error,
+) {
+	response, err := a.client.R().SetBody(data).SetCookies(cookies).Post(
+		a.
+			addressV1 + "/auth/forgot-password",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (a *TestApp) CreateAndSignIn(t *testing.T, data SignupData) []*http.Cookie {
+	t.Helper()
+	response, err := a.SignUp(data)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, response.StatusCode())
+
+	verificationToken, err := a.GetVerificationToken()
+
+	assert.NoError(t, err)
+	assert.NotEqual(t, verificationToken, "")
+
+	verificationResponse, err := a.VerifyAccount(
+		map[string]string{
+			"email": data.Email,
+			"token": verificationToken,
+		},
+	)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, verificationResponse.StatusCode())
+
+	signInResponse, err := a.SignIn(
+		map[string]string{
+			"email":    data.Email,
+			"password": data.Password,
+		},
+	)
+
+	assert.NoError(t, err)
+	assert.Equal(
+		t, http.StatusOK,
+		signInResponse.StatusCode(),
+	)
+
+	return signInResponse.Cookies()
 }

@@ -24,7 +24,7 @@ func (s *EmailClient) SendVerificationEmail(token, to string) error {
 			<body>
 				<h2>Hello!</h2>
 				<p>Please verify your account by clicking the link below:</p>
-				<p><a href="%s">Verify Account</a></p>
+				<p><a href="%s">Authenticate Account</a></p>
 				<p>Thank you!</p>
 			</body>
 		</html>

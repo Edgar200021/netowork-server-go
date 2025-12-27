@@ -17,19 +17,20 @@ import (
 
 	"github.com/Edgar200021/netowork-server-go/internal/app"
 	"github.com/Edgar200021/netowork-server-go/internal/config"
+	"github.com/alecthomas/assert/v2"
 	"github.com/go-resty/resty/v2"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 
 	_ "github.com/lib/pq"
-	"github.com/stretchr/testify/require"
 )
 
 type TestApp struct {
 	addressV1 string
 	client    *resty.Client
-	redis     *redis.Client
 	Db        *sql.DB
+	redis     *redis.Client
+	Config    *config.ApplicationConfig
 }
 
 func (a *TestApp) AssertValidationErrors(
@@ -40,11 +41,11 @@ func (a *TestApp) AssertValidationErrors(
 		Errors map[string][]string `json:"errors"`
 	}
 	err := json.Unmarshal(response.Body(), &respBody)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	for _, key := range keys {
 		_, ok := respBody.Errors[key]
-		require.True(t, ok)
+		assert.True(t, ok)
 	}
 }
 
@@ -103,5 +104,6 @@ func New(t *testing.T) *TestApp {
 		client:    c,
 		Db:        db,
 		redis:     client,
+		Config:    &cfg.Application,
 	}
 }

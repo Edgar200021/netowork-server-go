@@ -8,49 +8,52 @@ import (
 	"github.com/Edgar200021/netowork-server-go/.gen/netowork/public/model"
 	. "github.com/Edgar200021/netowork-server-go/.gen/netowork/public/table"
 	"github.com/Edgar200021/netowork-server-go/tests/testapp"
+	"github.com/alecthomas/assert/v2"
 	. "github.com/go-jet/jet/v2/postgres"
-	"github.com/stretchr/testify/suite"
 )
 
-type signupTestSuite struct {
-	suite.Suite
-	testApp    *testapp.TestApp
-	signupData testapp.SignupData
+func setupSignupTest(t *testing.T) (*testapp.TestApp, testapp.SignupData) {
+	t.Helper()
+	return testapp.New(t), testapp.GenerateFakeData[testapp.SignupData](t)
 }
 
-func (s *signupTestSuite) SetupTest() {
-	s.signupData = testapp.GenerateFakeData[testapp.SignupData]()
-	s.testApp = testapp.New(s.Suite.T())
+func TestSignup_Returns201_When_RequestIsValid(t *testing.T) {
+	t.Parallel()
+	app, data := setupSignupTest(t)
+
+	response, err := app.SignUp(data)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, response.StatusCode())
 }
 
-func (s *signupTestSuite) TestSignup_Returns201_When_RequestIsValid() {
-	response, err := s.testApp.SignUp(s.signupData)
+func TestSignup_ShouldBeSavedIntoDatabase_When_RequestIsValid(t *testing.T) {
+	t.Parallel()
+	app, data := setupSignupTest(t)
 
-	s.Require().NoError(err)
-	s.Equal(http.StatusCreated, response.StatusCode())
-}
+	response, err := app.SignUp(data)
 
-func (s *signupTestSuite) TestSignup_ShouldBeSavedIntoDatabase_When_RequestIsValid() {
-	response, err := s.testApp.SignUp(s.signupData)
-
-	s.Require().NoError(err)
-	s.Equal(http.StatusCreated, response.StatusCode())
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, response.StatusCode())
 
 	var dbUser model.Users
 
 	stmt := SELECT(
 		Users.ID, Users.IsVerified, Users.Password,
-	).FROM(Users).WHERE(Users.Email.EQ(Text(s.signupData.Email)))
+	).FROM(Users).WHERE(Users.Email.EQ(Text(data.Email)))
 
-	err = stmt.Query(s.testApp.Db, &dbUser)
+	err = stmt.Query(app.Db, &dbUser)
 
-	s.Require().NoError(err)
-	s.Require().NotEmpty(dbUser.ID)
-	s.Require().NotEqual(s.signupData.Password, dbUser.Password)
-	s.Require().False(dbUser.IsVerified)
+	assert.NoError(t, err)
+	assert.NotEqual(t, "", dbUser.ID.String())
+	assert.NotEqual(t, data.Password, dbUser.Password)
+	assert.False(t, dbUser.IsVerified)
 }
 
-func (s *signupTestSuite) TestSignup_Returns400_When_RequestIsInvalidValid() {
+func TestSignup_Returns400_When_RequestIsInvalidValid(t *testing.T) {
+	t.Parallel()
+	app, data := setupSignupTest(t)
+
 	testCases := []struct {
 		name               string
 		data               testapp.SignupData
@@ -59,7 +62,7 @@ func (s *signupTestSuite) TestSignup_Returns400_When_RequestIsInvalidValid() {
 		{
 			name: "empty email",
 			data: func() testapp.SignupData {
-				d := s.signupData
+				d := data
 				d.Email = ""
 				return d
 			}(),
@@ -68,7 +71,7 @@ func (s *signupTestSuite) TestSignup_Returns400_When_RequestIsInvalidValid() {
 		{
 			name: "invalid email",
 			data: func() testapp.SignupData {
-				d := s.signupData
+				d := data
 				d.Email = "invalid"
 				return d
 			}(),
@@ -77,7 +80,7 @@ func (s *signupTestSuite) TestSignup_Returns400_When_RequestIsInvalidValid() {
 		{
 			name: "empty password",
 			data: func() testapp.SignupData {
-				d := s.signupData
+				d := data
 				d.Password = ""
 				return d
 			}(),
@@ -86,8 +89,8 @@ func (s *signupTestSuite) TestSignup_Returns400_When_RequestIsInvalidValid() {
 		{
 			name: "password too short",
 			data: func() testapp.SignupData {
-				d := s.signupData
-				d.Password = "pass"
+				d := data
+				d.Password = strings.Repeat("q", testapp.PasswordMinLength-1)
 				return d
 			}(),
 			expectedErrorField: "password",
@@ -95,8 +98,8 @@ func (s *signupTestSuite) TestSignup_Returns400_When_RequestIsInvalidValid() {
 		{
 			name: "password too long",
 			data: func() testapp.SignupData {
-				d := s.signupData
-				d.Password = strings.Repeat("q", 41)
+				d := data
+				d.Password = strings.Repeat("q", testapp.PasswordMaxLength+1)
 				return d
 			}(),
 			expectedErrorField: "password",
@@ -104,7 +107,7 @@ func (s *signupTestSuite) TestSignup_Returns400_When_RequestIsInvalidValid() {
 		{
 			name: "empty firstName",
 			data: func() testapp.SignupData {
-				d := s.signupData
+				d := data
 				d.FirstName = ""
 				return d
 			}(),
@@ -113,8 +116,8 @@ func (s *signupTestSuite) TestSignup_Returns400_When_RequestIsInvalidValid() {
 		{
 			name: "firstName too short",
 			data: func() testapp.SignupData {
-				d := s.signupData
-				d.FirstName = "qw"
+				d := data
+				d.FirstName = strings.Repeat("q", testapp.FirstNameMinLength-1)
 				return d
 			}(),
 			expectedErrorField: "firstName",
@@ -122,8 +125,8 @@ func (s *signupTestSuite) TestSignup_Returns400_When_RequestIsInvalidValid() {
 		{
 			name: "firstName too long",
 			data: func() testapp.SignupData {
-				d := s.signupData
-				d.FirstName = strings.Repeat("q", 41)
+				d := data
+				d.FirstName = strings.Repeat("q", testapp.FirstNameMaxLength+1)
 				return d
 			}(),
 			expectedErrorField: "firstName",
@@ -131,7 +134,7 @@ func (s *signupTestSuite) TestSignup_Returns400_When_RequestIsInvalidValid() {
 		{
 			name: "empty lastName",
 			data: func() testapp.SignupData {
-				d := s.signupData
+				d := data
 				d.LastName = ""
 				return d
 			}(),
@@ -140,8 +143,8 @@ func (s *signupTestSuite) TestSignup_Returns400_When_RequestIsInvalidValid() {
 		{
 			name: "lastName too short",
 			data: func() testapp.SignupData {
-				d := s.signupData
-				d.LastName = "qw"
+				d := data
+				d.LastName = strings.Repeat("q", testapp.LastNameMinLength-1)
 				return d
 			}(),
 			expectedErrorField: "lastName",
@@ -149,8 +152,8 @@ func (s *signupTestSuite) TestSignup_Returns400_When_RequestIsInvalidValid() {
 		{
 			name: "lastName too long",
 			data: func() testapp.SignupData {
-				d := s.signupData
-				d.LastName = strings.Repeat("q", 41)
+				d := data
+				d.LastName = strings.Repeat("q", testapp.LastNameMaxLength+1)
 				return d
 			}(),
 			expectedErrorField: "lastName",
@@ -158,7 +161,7 @@ func (s *signupTestSuite) TestSignup_Returns400_When_RequestIsInvalidValid() {
 		{
 			name: "empty role",
 			data: func() testapp.SignupData {
-				d := s.signupData
+				d := data
 				d.Role = ""
 				return d
 			}(),
@@ -167,7 +170,7 @@ func (s *signupTestSuite) TestSignup_Returns400_When_RequestIsInvalidValid() {
 		{
 			name: "invalid role",
 			data: func() testapp.SignupData {
-				d := s.signupData
+				d := data
 				d.Role = "invalidrole"
 				return d
 			}(),
@@ -176,7 +179,7 @@ func (s *signupTestSuite) TestSignup_Returns400_When_RequestIsInvalidValid() {
 		{
 			name: "admin role",
 			data: func() testapp.SignupData {
-				d := s.signupData
+				d := data
 				d.Role = "admin"
 				return d
 			}(),
@@ -185,30 +188,29 @@ func (s *signupTestSuite) TestSignup_Returns400_When_RequestIsInvalidValid() {
 	}
 
 	for _, test := range testCases {
-		s.Run(
-			test.name, func() {
-				response, err := s.testApp.SignUp(test.data)
-				s.Require().NoError(err)
+		t.Run(
+			test.name, func(t *testing.T) {
+				t.Parallel()
+				response, err := app.SignUp(test.data)
+				assert.NoError(t, err)
 
-				s.Require().Equal(http.StatusBadRequest, response.StatusCode())
-				s.testApp.AssertValidationErrors(s.T(), response, test.expectedErrorField)
+				assert.Equal(t, http.StatusBadRequest, response.StatusCode())
+				app.AssertValidationErrors(t, response, test.expectedErrorField)
 			},
 		)
 	}
 }
 
-func (s *signupTestSuite) TestSignup_Return400_When_UserAlreadyExists() {
-	response, err := s.testApp.SignUp(s.signupData)
+func TestSignup_Return400_When_UserAlreadyExists(t *testing.T) {
+	t.Parallel()
+	app, data := setupSignupTest(t)
+	response, err := app.SignUp(data)
 
-	s.Require().NoError(err)
-	s.Equal(http.StatusCreated, response.StatusCode())
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusCreated, response.StatusCode())
 
-	secondResponse, err := s.testApp.SignUp(s.signupData)
+	secondResponse, err := app.SignUp(data)
 
-	s.Require().NoError(err)
-	s.Equal(http.StatusBadRequest, secondResponse.StatusCode())
-}
-
-func TestSignupTestSuite(t *testing.T) {
-	suite.Run(t, new(signupTestSuite))
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, secondResponse.StatusCode())
 }
