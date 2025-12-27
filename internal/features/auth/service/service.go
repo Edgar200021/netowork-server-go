@@ -47,7 +47,7 @@ func (s *AuthService) generateSessionKey(sessionId string) string {
 }
 
 func (s *AuthService) generateResetPasswordKey(token string) string {
-	return fmt.Sprintf("%s%s", ResetPasswordPrefix, token)
+	return fmt.Sprintf("%s%s", CacheResetPasswordPrefix, token)
 }
 
 func New(

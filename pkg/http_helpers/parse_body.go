@@ -23,9 +23,10 @@ func ParseBody[T any](w http.ResponseWriter, r *http.Request) (*T, error) {
 	if err := validate.Struct(parsed); err != nil {
 		if validationErrors, ok := err.(validator.ValidationErrors); ok {
 			errorsMap := make(map[string][]string)
+			structType := reflect.TypeOf(parsed)
 
 			for _, ve := range validationErrors {
-				field := strings.ToLower(ve.Field())
+				field := jsonFieldName(structType, ve.Field())
 				errorsMap[field] = append(errorsMap[field], validationMessage(ve))
 			}
 
@@ -38,6 +39,21 @@ func ParseBody[T any](w http.ResponseWriter, r *http.Request) (*T, error) {
 	}
 
 	return &parsed, nil
+}
+
+func jsonFieldName(structType reflect.Type, fieldName string) string {
+	field, ok := structType.FieldByName(fieldName)
+	if !ok {
+		return fieldName
+	}
+
+	jsonTag := field.Tag.Get("json")
+	if jsonTag == "" {
+		return fieldName
+	}
+	
+	name := strings.Split(jsonTag, ",")[0]
+	return name
 }
 
 func validationMessage(ve validator.FieldError) string {
