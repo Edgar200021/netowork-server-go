@@ -83,6 +83,7 @@ func New(t *testing.T) *TestApp {
 
 	log.SetOutput(io.Discard)
 
+
 	go func() {
 		if err := application.Run(); err != nil {
 			if !errors.Is(err, http.ErrServerClosed) {

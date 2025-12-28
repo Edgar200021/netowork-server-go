@@ -9,53 +9,64 @@ import (
 	"github.com/alecthomas/assert/v2"
 )
 
-func setupLogoutTest(t *testing.T) (*testapp.TestApp, testapp.SignupData) {
-	t.Helper()
-
-	return testapp.New(t), testapp.GenerateFakeData[testapp.SignupData](t)
-}
-
-func TestLogout_Returns200_When_RequestIsValid(t *testing.T) {
+func TestLogout(t *testing.T) {
+	setup := func(t *testing.T) (*testapp.TestApp, testapp.SignupData) {
+		t.Helper()
+		return testapp.New(t), testapp.GenerateFakeData[testapp.SignupData](t)
+	}
 	t.Parallel()
-	app, data := setupLogoutTest(t)
-	cookies := app.CreateAndSignIn(t, data)
 
-	response, err := app.Logout(cookies)
+	t.Run(
+		"Returns 200 when request is valid",
+		func(t *testing.T) {
+			t.Parallel()
+			app, data := setup(t)
+			cookies := app.CreateAndSignIn(t, data)
 
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusOK, response.StatusCode())
+			response, err := app.Logout(cookies)
 
-	logoutCookies := slice_helpers.Filter(
-		response.Cookies(), func(val *http.Cookie) bool {
-			return val.Name == app.Config.SessionCookieName
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusOK, response.StatusCode())
+
+			logoutCookies := slice_helpers.Filter(
+				response.Cookies(),
+				func(val *http.Cookie) bool {
+					return val.Name == app.Config.SessionCookieName
+				},
+			)
+
+			assert.Equal(t, 1, len(logoutCookies))
+			assert.Equal(t, -1, logoutCookies[0].MaxAge)
 		},
 	)
 
-	assert.Equal(t, 1, len(logoutCookies))
-	assert.Equal(t, logoutCookies[0].MaxAge, -1)
-}
+	t.Run(
+		"Returns 400 when user is banned",
+		func(t *testing.T) {
+			t.Parallel()
+			app, data := setup(t)
+			cookies := app.CreateAndSignIn(t, data)
 
-func TestLogout_Returns400_When_UserIsBanned(t *testing.T) {
-	t.Parallel()
-	app, data := setupLogoutTest(t)
-	cookies := app.CreateAndSignIn(t, data)
+			err := app.BanUser(data.Email)
+			assert.NoError(t, err)
 
-	err := app.BanUser(data.Email)
-	assert.NoError(t, err)
+			response, err := app.Logout(cookies)
 
-	response, err := app.Logout(cookies)
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusBadRequest, response.StatusCode())
+		},
+	)
 
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusBadRequest, response.StatusCode())
+	t.Run(
+		"Returns 401 when user is not authorized",
+		func(t *testing.T) {
+			t.Parallel()
+			app, _ := setup(t)
 
-}
+			response, err := app.Logout(nil)
 
-func TestLogout_Returns401_When_UserIsNotAuthorized(t *testing.T) {
-	t.Parallel()
-	app, _ := setupLogoutTest(t)
-
-	response, err := app.Logout(nil)
-
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusUnauthorized, response.StatusCode())
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusUnauthorized, response.StatusCode())
+		},
+	)
 }

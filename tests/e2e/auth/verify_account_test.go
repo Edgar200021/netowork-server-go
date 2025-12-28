@@ -11,203 +11,229 @@ import (
 	. "github.com/go-jet/jet/v2/postgres"
 )
 
-func setupVerifyAccountTest(t *testing.T) (*testapp.TestApp, testapp.SignupData, string) {
-	t.Helper()
+func TestVerifyAccount(t *testing.T) {
+	setup := func(t *testing.T) (*testapp.TestApp, testapp.SignupData, string) {
+		t.Helper()
 
-	signupData := testapp.GenerateFakeData[testapp.SignupData](t)
-	app := testapp.New(t)
+		signupData := testapp.GenerateFakeData[testapp.SignupData](t)
+		app := testapp.New(t)
 
-	response, err := app.SignUp(signupData)
+		response, err := app.SignUp(signupData)
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusCreated, response.StatusCode())
 
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusCreated, response.StatusCode())
+		verificationToken, err := app.GetVerificationToken()
+		assert.NoError(t, err)
+		assert.NotEqual(t, "", verificationToken)
 
-	verificationToken, err := app.GetVerificationToken()
-
-	assert.NoError(t, err)
-	assert.NotEqual(t, verificationToken, "")
-
-	return app, signupData, verificationToken
-}
-
-func TestVerifyAccount_Returns200_When_RequestIsValid(t *testing.T) {
-	t.Parallel()
-	app, data, token := setupVerifyAccountTest(t)
-
-	verifyAccountResponse, err := app.VerifyAccount(
-		map[string]string{
-			"email": data.Email,
-			"token": token,
-		},
-	)
-
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusOK, verifyAccountResponse.StatusCode())
-}
-
-func TestVerifyAccount_ShouldApplyChangesIntoDatabase_When_RequestIsValid(t *testing.T) {
-	t.Parallel()
-	app, data, token := setupVerifyAccountTest(t)
-
-	verifyAccountResponse, err := app.VerifyAccount(
-		map[string]string{
-			"email": data.Email,
-			"token": token,
-		},
-	)
-
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusOK, verifyAccountResponse.StatusCode())
-
-	dbUser, err := app.GetUser(data.Email)
-
-	assert.NoError(t, err)
-	assert.True(t, dbUser.IsVerified)
-}
-
-func TestVerifyAccount_Return400_When_RequestIsInvalid(t *testing.T) {
-	t.Parallel()
-	app, _, _ := setupVerifyAccountTest(t)
-
-	testCases := []struct {
-		name               string
-		data               map[string]string
-		expectedErrorField string
-	}{
-		{
-			name: "empty email",
-			data: map[string]string{
-				"token": "some token",
-			},
-			expectedErrorField: "email",
-		},
-		{
-			name: "invalid email",
-			data: map[string]string{
-				"email": "invalid email",
-				"token": "some token",
-			},
-			expectedErrorField: "email",
-		},
-		{
-			name: "empty token",
-			data: map[string]string{
-				"email": faker.Email(),
-			},
-			expectedErrorField: "token",
-		},
+		return app, signupData, verificationToken
 	}
-
-	for _, test := range testCases {
-		t.Run(
-			test.name, func(t *testing.T) {
-				t.Parallel()
-				response, err := app.VerifyAccount(test.data)
-
-				assert.NoError(t, err)
-				assert.Equal(t, http.StatusBadRequest, response.StatusCode())
-				app.AssertValidationErrors(t, response, test.expectedErrorField)
-			},
-		)
-	}
-}
-
-func TestVerifyAccount_Returns400_When_TokenIsInvalidOrEmailIsDifferent(t *testing.T) {
 	t.Parallel()
-	app, data, token := setupVerifyAccountTest(t)
 
-	testCases := []struct {
-		name string
-		data map[string]string
-	}{
-		{
-			name: "random token",
-			data: map[string]string{
-				"email": data.Email,
-				"token": "random token",
-			},
-		},
-		{
-			name: "random token",
-			data: map[string]string{
-				"email": faker.Email(),
-				"token": token,
-			},
-		},
-	}
+	t.Run(
+		"Returns 200 when request is successful",
+		func(t *testing.T) {
+			t.Parallel()
+			app, data, token := setup(t)
 
-	for _, test := range testCases {
-		t.Run(
-			test.name, func(t *testing.T) {
+			response, err := app.VerifyAccount(
+				map[string]string{
+					"email": data.Email,
+					"token": token,
+				},
+			)
 
-				t.Parallel()
-				response, err := app.VerifyAccount(test.data)
-
-				assert.NoError(t, err)
-				assert.Equal(t, http.StatusBadRequest, response.StatusCode())
-			},
-		)
-	}
-
-}
-
-func TestVerifyAccount_Returns400_When_UserIsBanned(t *testing.T) {
-	t.Parallel()
-	app, data, token := setupVerifyAccountTest(t)
-
-	err := app.BanUser(data.Email)
-	assert.NoError(t, err)
-
-	response, err := app.VerifyAccount(
-		map[string]string{
-			"email": data.Email,
-			"token": token,
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusOK, response.StatusCode())
 		},
 	)
 
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusBadRequest, response.StatusCode())
-}
+	t.Run(
+		"Should apply changes into database when request is successful",
+		func(t *testing.T) {
+			t.Parallel()
+			app, data, token := setup(t)
 
-func TestVerifyAccount_Returns400_When_TokenExpired(t *testing.T) {
-	t.Parallel()
-	app, data, token := setupVerifyAccountTest(t)
+			response, err := app.VerifyAccount(
+				map[string]string{
+					"email": data.Email,
+					"token": token,
+				},
+			)
 
-	err := app.ExpireVerificationToken()
-	assert.NoError(t, err)
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusOK, response.StatusCode())
 
-	response, err := app.VerifyAccount(
-		map[string]string{
-			"email": data.Email,
-			"token": token,
+			dbUser, err := app.GetUser(data.Email)
+			assert.NoError(t, err)
+			assert.True(t, dbUser.IsVerified)
 		},
 	)
 
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusBadRequest, response.StatusCode())
-}
+	t.Run(
+		"Returns 400 when request is invalid",
+		func(t *testing.T) {
+			t.Parallel()
+			app, _, _ := setup(t)
 
-func TestVerifyAccount_Returns404_When_UserIsNotFound(t *testing.T) {
-	t.Parallel()
-	app, data, token := setupVerifyAccountTest(t)
+			testCases := []struct {
+				name               string
+				data               map[string]string
+				expectedErrorField string
+			}{
+				{
+					name: "empty email",
+					data: map[string]string{
+						"token": "some token",
+					},
+					expectedErrorField: "email",
+				},
+				{
+					name: "invalid email",
+					data: map[string]string{
+						"email": "invalid email",
+						"token": "some token",
+					},
+					expectedErrorField: "email",
+				},
+				{
+					name: "empty token",
+					data: map[string]string{
+						"email": faker.Email(),
+					},
+					expectedErrorField: "token",
+				},
+			}
 
-	deleteStmt := Users.DELETE().WHERE(Users.Email.EQ(Text(data.Email)))
-	res, err := deleteStmt.Exec(app.Db)
+			for _, tc := range testCases {
+				tc := tc
 
-	assert.NoError(t, err)
+				t.Run(
+					tc.name,
+					func(t *testing.T) {
+						t.Parallel()
+						response, err := app.VerifyAccount(tc.data)
 
-	deletedRows, err := res.RowsAffected()
-
-	assert.NoError(t, err)
-	assert.Equal(t, 1, deletedRows)
-
-	response, err := app.VerifyAccount(
-		map[string]string{
-			"email": data.Email,
-			"token": token,
+						assert.NoError(t, err)
+						assert.Equal(t, http.StatusBadRequest, response.StatusCode())
+						app.AssertValidationErrors(t, response, tc.expectedErrorField)
+					},
+				)
+			}
 		},
 	)
 
-	assert.NoError(t, err)
-	assert.Equal(t, http.StatusNotFound, response.StatusCode())
+	t.Run(
+		"Returns 400 when token is invalid or email is different",
+		func(t *testing.T) {
+			t.Parallel()
+			app, data, token := setup(t)
+
+			testCases := []struct {
+				name string
+				data map[string]string
+			}{
+				{
+					name: "random token",
+					data: map[string]string{
+						"email": data.Email,
+						"token": "random token",
+					},
+				},
+				{
+					name: "different email",
+					data: map[string]string{
+						"email": faker.Email(),
+						"token": token,
+					},
+				},
+			}
+
+			for _, tc := range testCases {
+				tc := tc
+
+				t.Run(
+					tc.name,
+					func(t *testing.T) {
+						t.Parallel()
+						response, err := app.VerifyAccount(tc.data)
+
+						assert.NoError(t, err)
+						assert.Equal(t, http.StatusBadRequest, response.StatusCode())
+					},
+				)
+			}
+		},
+	)
+
+	t.Run(
+		"Returns 400 when user is banned",
+		func(t *testing.T) {
+			t.Parallel()
+			app, data, token := setup(t)
+
+			err := app.BanUser(data.Email)
+			assert.NoError(t, err)
+
+			response, err := app.VerifyAccount(
+				map[string]string{
+					"email": data.Email,
+					"token": token,
+				},
+			)
+
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusBadRequest, response.StatusCode())
+		},
+	)
+
+	t.Run(
+		"Returns 400 when token is expired",
+		func(t *testing.T) {
+			t.Parallel()
+			app, data, token := setup(t)
+
+			err := app.ExpireVerificationToken()
+			assert.NoError(t, err)
+
+			response, err := app.VerifyAccount(
+				map[string]string{
+					"email": data.Email,
+					"token": token,
+				},
+			)
+
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusBadRequest, response.StatusCode())
+		},
+	)
+
+	t.Run(
+		"Returns 404 when user is not found",
+		func(t *testing.T) {
+			t.Parallel()
+			app, data, token := setup(t)
+
+			deleteStmt := Users.
+				DELETE().
+				WHERE(Users.Email.EQ(Text(data.Email)))
+
+			res, err := deleteStmt.Exec(app.Db)
+			assert.NoError(t, err)
+
+			deletedRows, err := res.RowsAffected()
+			assert.NoError(t, err)
+			assert.Equal(t, 1, deletedRows)
+
+			response, err := app.VerifyAccount(
+				map[string]string{
+					"email": data.Email,
+					"token": token,
+				},
+			)
+
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusNotFound, response.StatusCode())
+		},
+	)
 }
